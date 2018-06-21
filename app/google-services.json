@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "135398769701",
+    "firebase_url": "https://logtool-4d4c2.firebaseio.com",
+    "project_id": "logtool-4d4c2",
+    "storage_bucket": "logtool-4d4c2.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:135398769701:android:4a0191dced214f66",
+        "android_client_info": {
+          "package_name": "com.aoitek.logtool"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "135398769701-2t5304r4umatv5np7r00j7kpmald9csq.apps.googleusercontent.com",
+          "client_type": 3
+        },
+        {
+          "client_id": "135398769701-2t5304r4umatv5np7r00j7kpmald9csq.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDwsnz9kMKOWOcSFeIa-o4hxnNLMaP8vtA"
+        }
+      ],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "ads_service": {
+          "status": 2
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
