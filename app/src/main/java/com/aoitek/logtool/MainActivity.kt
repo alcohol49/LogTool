@@ -4,7 +4,6 @@ import android.Manifest
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -12,7 +11,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkInfo
 import android.os.Build
 import android.os.Bundle
-import android.os.Messenger
+import android.os.FileObserver
 import android.preference.PreferenceManager
 import android.support.v4.app.ActivityCompat
 import android.support.v4.content.ContextCompat
@@ -21,6 +20,8 @@ import android.util.Log
 import android.view.View
 import android.widget.*
 import java.io.File
+import com.crashlytics.android.Crashlytics
+import io.fabric.sdk.android.Fabric
 
 
 class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
@@ -28,20 +29,26 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     val TAG = "MainActivity"
     val MY_PERMISSIONS_REQUEST_WRITE_EXTERNAL_STORAGE = 0
 
-    lateinit private var handler: MessageHandler
-    lateinit private var messenger: Messenger
-
     lateinit var filesListTextView: TextView
 
     var alarmInterval = 60 * 60 * 1000
 
+    val observer = object : FileObserver(ZIP_FILE_PATH, (FileObserver.CREATE or FileObserver.DELETE)) {
+        override fun onEvent(event: Int, path: String?) {
+            if (path?.endsWith(".zip") == true) {
+                runOnUiThread({ refreshList() })
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        Fabric.with(this, Crashlytics())
+
         setContentView(R.layout.activity_main)
         createNotificationChannel()
         filesListTextView = findViewById(R.id.filesList)
-        handler = MessageHandler(this)
-        messenger = Messenger(handler)
 
         findViewById<Button>(R.id.refreshButton).setOnClickListener { refreshList() }
         findViewById<Button>(R.id.uploadButton).setOnClickListener { forceUpload() }
@@ -63,10 +70,12 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     override fun onStart() {
         super.onStart()
         refreshList()
+        observer.startWatching()
     }
 
     override fun onStop() {
         super.onStop()
+        observer.stopWatching()
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
@@ -84,13 +93,12 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
     override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
         Log.d(TAG, "onItemSelected $position")
         when (position) {
-            0 -> alarmInterval = 15 * 60 * 1000
+            0 -> alarmInterval = 15 * 60 * 1000 // / 60 / 5
             1 -> alarmInterval = 30 * 60 * 1000
             2 -> alarmInterval = 60 * 60 * 1000
         }
 
         val intent = Intent(applicationContext, WorkerService::class.java)
-        intent.putExtra(MESSENGER_INTENT_KEY, messenger)
         intent.putExtra(ALARM_INTERVAL_KEY, alarmInterval)
 
         val preference = PreferenceManager.getDefaultSharedPreferences(applicationContext)
@@ -137,7 +145,6 @@ class MainActivity : AppCompatActivity(), AdapterView.OnItemSelectedListener {
         if (activeNetwork?.isConnectedOrConnecting == true) {
             val intent = Intent(applicationContext, WorkerService::class.java)
             intent.putExtra(UPLOAD_ONLY_KEY, true)
-            intent.putExtra(MESSENGER_INTENT_KEY, Messenger(handler))
             startService(intent)
         } else {
             Toast.makeText(applicationContext, "No Network", Toast.LENGTH_SHORT).show()

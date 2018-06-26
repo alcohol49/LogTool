@@ -24,7 +24,6 @@ class WorkerService : Service() {
     val TAG = "WorkerService"
     val mNotificationId = 1
     lateinit var mWakeLock: PowerManager.WakeLock
-    private var activityMessenger: Messenger? = null
 
     override fun onBind(intent: Intent?): IBinder? {
         return null
@@ -43,15 +42,13 @@ class WorkerService : Service() {
 //        mWakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "WorkerService")
 //        mWakeLock.acquire()
 
-        activityMessenger = intent.getParcelableExtra(MESSENGER_INTENT_KEY)
-
         if (intent.getBooleanExtra(UPLOAD_ONLY_KEY, false)) {
             uploadFiles()
         } else {
             PackAsyncTask(this).execute()
 
             val interval = intent.getIntExtra(ALARM_INTERVAL_KEY, 60 * 60 * 1000)
-            scheduleAlarm(applicationContext, activityMessenger, interval)
+            scheduleAlarm(applicationContext, interval)
         }
 
         return START_STICKY
@@ -62,10 +59,9 @@ class WorkerService : Service() {
         Log.d(TAG, "onDestroy")
     }
 
-    fun scheduleAlarm(context: Context, messenger: Messenger?, triggerAtMillis: Int) {
+    fun scheduleAlarm(context: Context, triggerAtMillis: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val workerIntent = Intent(context, WorkerService::class.java)
-        workerIntent.putExtra(MESSENGER_INTENT_KEY, messenger)
         workerIntent.putExtra(ALARM_INTERVAL_KEY, triggerAtMillis)
 
         val pi = PendingIntent.getService(context, 0, workerIntent, PendingIntent.FLAG_CANCEL_CURRENT)
@@ -117,12 +113,12 @@ class WorkerService : Service() {
             val service = mService.get() ?: return
             val files = File(LOGS_FILE_PATH).listFiles()
             if (files != null) {
-                val format = SimpleDateFormat("yyyyMMdd-hhmmss", Locale.getDefault()).format(Date()) + ".zip"
+                val format = SimpleDateFormat("yyyyMMdd-HHmmss", Locale.getDefault()).format(Date()) + ".zip"
 
                 val dir = File(ZIP_FILE_PATH)
                 if (!dir.exists()) dir.mkdir()
 
-                val zipFile = File(ZIP_FILE_PATH + File.separator +format)
+                val zipFile = File(ZIP_FILE_PATH + File.separator + format)
                 service.zipFiles(files, zipFile)
 
                 // Firebase event
@@ -137,7 +133,6 @@ class WorkerService : Service() {
         override fun onPostExecute(result: Unit?) {
             val service = mService.get() ?: return
             service.uploadFiles()
-            service.sendMessage(MSG_REFRESH_LIST)
         }
     }
 
@@ -165,7 +160,7 @@ class WorkerService : Service() {
         val storageRef = storage.reference
 
         val fileUri = Uri.fromFile(file)
-        val fileRef = storageRef.child(fileUri.lastPathSegment)
+        val fileRef = storageRef.child(Build.MODEL + "/" + fileUri.lastPathSegment)
         val uploadTask = fileRef.putFile(fileUri)
 
         uploadTask
@@ -183,8 +178,6 @@ class WorkerService : Service() {
                     val bundle = Bundle()
                     bundle.putString(FILE_NAME_FIREBASE_KEY, fileName)
                     FirebaseAnalytics.getInstance(applicationContext).logEvent(FILE_UPLOADED_FIREBASE_EVENT, bundle)
-
-                    sendMessage(MSG_REFRESH_LIST)
                 }
     }
 
@@ -196,21 +189,5 @@ class WorkerService : Service() {
         val mNotificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val id = Date().time / 1000
         mNotificationManager.notify(id.toInt(), mBuilder.build())
-    }
-
-    private fun sendMessage(messageID: Int) {
-        if (activityMessenger == null) {
-            Log.d(TAG, "Service is bound, not started. There's no callback to send a message to.")
-            return
-        }
-        val message = Message.obtain()
-        message.run {
-            what = messageID
-        }
-        try {
-            activityMessenger?.send(message)
-        } catch (e: RemoteException) {
-            Log.e(TAG, "Error passing service object back to activity.")
-        }
     }
 }
